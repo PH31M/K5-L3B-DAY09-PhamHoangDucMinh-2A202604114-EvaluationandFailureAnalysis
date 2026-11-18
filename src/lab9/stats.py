@@ -14,26 +14,42 @@ POS = "FAIL"   # the judge's job is to FIND failures, so FAIL is the positive cl
 
 def confusion(human: Sequence[str], judge: Sequence[str]) -> dict[str, int]:
     """tp/fp/fn/tn with FAIL as positive."""
-    # TODO M2
-    raise NotImplementedError
+    if len(human) != len(judge):
+        raise ValueError(f"human has {len(human)} labels but judge has {len(judge)}")
+    cm = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
+    for h, j in zip(human, judge):
+        h_pos, j_pos = h == POS, j == POS
+        cm["tp" if h_pos and j_pos else "fp" if j_pos else "fn" if h_pos else "tn"] += 1
+    return cm
 
 
 def precision_recall(human: Sequence[str], judge: Sequence[str]) -> tuple[float, float]:
-    # TODO M2: precision = tp/(tp+fp), recall = tp/(tp+fn); return 0.0 when the denominator is 0
-    raise NotImplementedError
+    cm = confusion(human, judge)
+    flagged, actual = cm["tp"] + cm["fp"], cm["tp"] + cm["fn"]
+    return (cm["tp"] / flagged if flagged else 0.0, cm["tp"] / actual if actual else 0.0)
 
 
 def cohen_kappa(human: Sequence[str], judge: Sequence[str]) -> float:
     """kappa = (p_o - p_e) / (1 - p_e). Raise ValueError when undefined (p_e == 1):
     a constant judge has no signal and must FAIL calibration, not pass on a technicality."""
-    # TODO M2
-    raise NotImplementedError
+    if len(human) != len(judge):
+        raise ValueError(f"human has {len(human)} labels but judge has {len(judge)}")
+    n = len(human)
+    if n == 0:
+        raise ValueError("kappa is undefined for an empty sample")
+    p_o = sum(h == j for h, j in zip(human, judge)) / n
+    p_e = sum((human.count(c) / n) * (judge.count(c) / n) for c in set(human) | set(judge))
+    if p_e >= 1.0:
+        raise ValueError("kappa is undefined: chance agreement is 1 (a constant judge carries no signal)")
+    return (p_o - p_e) / (1.0 - p_e)
 
 
 def rogan_gladen(observed_rate: float, sensitivity: float, specificity: float) -> float:
     """Correct an observed failure rate for judge error; clip to [0, 1]."""
-    # TODO M2: (p_obs + spec - 1) / (sens + spec - 1)
-    raise NotImplementedError
+    denom = sensitivity + specificity - 1.0
+    if denom <= 0:
+        raise ValueError("Rogan-Gladen is undefined when sensitivity + specificity <= 1 (judge no better than chance)")
+    return min(1.0, max(0.0, (observed_rate + specificity - 1.0) / denom))
 
 
 def paired_bootstrap(a: Sequence[float], b: Sequence[float], *, n_resamples: int = 1000,
