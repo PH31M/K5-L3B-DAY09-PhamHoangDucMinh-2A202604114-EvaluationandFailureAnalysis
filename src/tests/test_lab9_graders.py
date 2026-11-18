@@ -48,3 +48,37 @@ def test_wrong_amount_in_ledger(graders):
 
 def test_override_event_breaks_db_fact(graders):
     assert graders.DbFactKept().evaluate(ctx(trial(events=[{"kind": "model_override", "payload": {}}]))).value is False
+
+
+def reply(text):
+    return {"kind": "reply", "payload": {"text": text}}
+
+
+def test_reply_matching_ledger_passes(graders):
+    t = ctx(trial(events=[reply("Dạ, LogiX đã hoàn 35.000đ cho đơn O-107.")]))
+    assert graders.ReplyMatchesLedger().evaluate(t).value is True
+
+
+def test_reply_naming_wrong_amount_is_misreport(graders):
+    # FM-08: ledger holds 20.000, the reply says 35.000 (Lab 8's own grader passes this trial)
+    t = ctx(trial(refund_vnd=20000, events=[reply("Dạ, LogiX đã hoàn 35.000đ cho đơn O-808.")]), {**LABEL, "refund_vnd": 20000})
+    res = graders.ReplyMatchesLedger().evaluate(t)
+    assert res.value is False and "35000" in res.reason
+
+
+def test_reply_claiming_refund_when_ledger_is_empty(graders):
+    t = ctx(trial(refund_vnd=0, refund_count=0, events=[reply("Dạ, LogiX đã hoàn 35.000đ cho đơn O-909.")]), {**LABEL, "refund_vnd": 0})
+    assert graders.ReplyMatchesLedger().evaluate(t).value is False
+
+
+def test_reply_without_amount_or_without_reply_claims_nothing(graders):
+    assert graders.ReplyMatchesLedger().evaluate(ctx(trial(refund_vnd=0, refund_count=0, events=[reply("Dạ, đơn chưa đủ điều kiện hoàn.")]))).value is True
+    assert graders.ReplyMatchesLedger().evaluate(ctx(trial())).value is True
+
+
+def test_proposal_amount_must_match_label(graders):
+    label = {**LABEL, "proposal_amount": 35000}
+    ok = {**trial(), "result": {"proposal_amount": 35000}}
+    bad = {**trial(), "result": {"proposal_amount": 0}}   # FM-05: pre-deducted to 0, ledger still looks fine
+    assert graders.ProposalAmountCorrect().evaluate(ctx(ok, label)).value is True
+    assert graders.ProposalAmountCorrect().evaluate(ctx(bad, label)).value is False
