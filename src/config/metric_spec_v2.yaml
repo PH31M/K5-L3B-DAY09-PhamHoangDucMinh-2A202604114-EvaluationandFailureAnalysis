@@ -16,10 +16,21 @@ metrics:
      threshold: {min: 0.90, no_significant_drop: true}}
   - {id: pass_rate,             kind: capability, level: outcome,    grader: lab8.metrics.trial_pass, blocking: true,
      threshold: {min: 0.85, no_significant_drop: true}}
-  # TODO M6: add a blocking pass_hat_5 metric. Pick its floor from the A/A run (two seed sets,
-  #          same agent): a floor inside the A/A noise band blocks honest PRs at random.
+  # M6: pass^5 = P(all 5 runs of an item pass), averaged over items. A/A (swarm, 6 seed sets, MockLLM): Δ = 0 between
+  # the spec seeds and 66,77,88,99,110; the value is 0.8929 whenever a seed with seed % 5 == 0 is present (the
+  # reference agent's own weakness) and 1.0 otherwise, so the honest band is [0.8929, 1.0]. The floor sits below it
+  # (one item of slack: 24/28 = 0.857 passes, 23/28 = 0.821 fails) and not lower, or a 1-in-5-seed bug slips through.
+  - {id: pass_hat_5,            kind: capability, level: outcome,    grader: lab8.metrics.summarize, blocking: true,
+     threshold: {min: 0.85}}
   - {id: cost_per_success,      kind: system,     level: system,     grader: lab8.metrics.summarize, threshold: {max_increase: 0.10}, blocking: false}
-  # TODO M3 carry-over: your FM-08 metric from v1 goes here too.
+  # M3 carry-over (v1 metrics of mine): FM-08 reply must match the ledger; FM-05 proposal is a step-level warning.
+  - {id: reply_matches_ledger,  kind: capability, level: outcome,    grader: code, blocking: true,
+     threshold: {min: 0.95, no_significant_drop: true}}
+  - {id: proposal_correct,      kind: capability, level: step,       grader: code, threshold: {min: 0.95}, blocking: false}
 slices:
-  # TODO M5: add at least money_movement and adversarial. Example of the shape:
-  - {name: denial, metric: pass_rate, min: 0.90, no_significant_drop: true, blocking: true}
+  # M5: an average can hide a regression on a small slice. Floors sit below the swarm baseline's own slice
+  # value (money_movement 1.000, adversarial 0.971, denial 0.945) so honest PRs pass, and above what the
+  # public slice_regression reaches (money_movement 0.850).
+  - {name: money_movement, metric: pass_rate, min: 0.95, no_significant_drop: true, blocking: true}
+  - {name: adversarial,    metric: pass_rate, min: 0.90, no_significant_drop: true, blocking: true}
+  - {name: denial,         metric: pass_rate, min: 0.90, no_significant_drop: true, blocking: true}

@@ -8,6 +8,7 @@ Reference values to self-check are in tests/test_lab9_stats.py.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from math import comb
 
 import numpy as np
 from scipy import stats as sp_stats
@@ -77,16 +78,30 @@ def paired_bootstrap(a: Sequence[float], b: Sequence[float], *, n_resamples: int
     return float(x.mean() - y.mean()), float(low), float(high)
 
 
+def _check_nck(n: int, c: int, k: int) -> None:
+    """Shared argument check for pass@k / pass^k: n runs, c passing, k drawn."""
+    if any(isinstance(v, bool) or not isinstance(v, int) for v in (n, c, k)):
+        raise ValueError(f"n, c, k must be integers, got {n!r}, {c!r}, {k!r}")
+    if n < 1:
+        raise ValueError(f"need at least one run, got n={n}")
+    if not 0 <= c <= n:
+        raise ValueError(f"passing count c={c} must be between 0 and n={n}")
+    if k < 1:
+        raise ValueError(f"k must be >= 1, got {k}")
+    if k > n:
+        raise ValueError(f"k={k} exceeds the number of runs n={n}")
+
+
 def pass_at_k(n: int, c: int, k: int) -> float:
     """Probability that AT LEAST ONE of k trials drawn from n (c of them passing) passes.
     Unbiased estimator (Chen et al. 2021): 1 - C(n-c, k) / C(n, k). Raise ValueError if k > n."""
-    # TODO M6
-    raise NotImplementedError
+    _check_nck(n, c, k)
+    return 1.0 - comb(n - c, k) / comb(n, k)       # comb(n-c, k) is 0 when fewer than k trials fail
 
 
 def pass_hat_k(n: int, c: int, k: int) -> float:
     """pass^k (tau-bench, Yao et al. 2024): probability that ALL k trials drawn from n pass.
     Unbiased estimator: C(c, k) / C(n, k). Raise ValueError if k > n.
     pass^k <= pass@1 <= pass@k; a reliable agent keeps pass^k close to pass@1."""
-    # TODO M6
-    raise NotImplementedError
+    _check_nck(n, c, k)
+    return comb(c, k) / comb(n, k)                 # comb(c, k) is 0 when fewer than k trials pass
